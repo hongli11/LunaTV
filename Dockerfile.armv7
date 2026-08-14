@@ -43,8 +43,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/next.config.js ./
 COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./
 
-# 最小化运行时依赖：只装 next、react、react-dom 等生产必需
-RUN npm install --omit=dev --ignore-scripts --no-audit --no-fund
+RUN corepack enable && corepack prepare pnpm@latest --activate
+# 用 pnpm 按 lockfile 装生产依赖（避免 npm 重新解析 peer 冲突）
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts --no-optional
 
 USER nextjs
 
