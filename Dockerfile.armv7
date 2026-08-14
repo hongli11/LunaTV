@@ -1,0 +1,53 @@
+# arm/v7 运行时镜像。
+# 策略：编译用 amd64（无 arm swc 二进制），运行用 arm/v7 + `next start`。
+# standalone 会打包 amd64 node 二进制，不可用；改用完整 .next + next start。
+# ---- 第 1 阶段：amd64 安装依赖 ----
+FROM --platform=linux/amd64 node:20-alpine AS deps
+
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+WORKDIR /app
+COPY package.json pnpm-lock.yaml ./
+
+ENV PERSISTED_TO_FILE=true
+RUN pnpm install --frozen-lockfile
+
+# ---- 第 2 阶段：amd64 编译（webpack） ----
+FROM --platform=linux/amd64 node:20-alpine AS builder
+RUN corepack enable && corepack prepare pnpm@latest --activate
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+ENV DOCKER_ENV=true
+
+RUN pnpm run build
+
+# ---- 第 3 阶段：arm/v7 运行时 ----
+FROM node:20-alpine AS runner
+
+RUN addgroup -g 1001 -S nodejs && adduser -u 1001 -S nextjs -G nodejs
+
+WORKDIR /app
+ENV NODE_ENV=production
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
+ENV DOCKER_ENV=true
+
+# 复制完整 .next + package.json + 运行时依赖 + scripts
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
+COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder --chown=nextjs:nodejs /app/next.config.js ./
+COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./
+
+# 最小化运行时依赖：只装 next、react、react-dom 等生产必需
+RUN npm install --omit=dev --ignore-scripts --no-audit --no-fund
+
+USER nextjs
+
+EXPOSE 3000
+
+CMD ["npx", "next", "start", "-p", "3000", "-H", "0.0.0.0"]

@@ -9,7 +9,7 @@ on:
         default: 'latest'
         type: string
   push:
-    branches: [main, master]
+    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -29,8 +29,6 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm/v7
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -52,7 +50,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          file: ./Dockerfile.armv7
           platforms: linux/arm/v7
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/lunatv:armv7-${{ steps.tag.outputs.tag }}
