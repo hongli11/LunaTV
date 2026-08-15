@@ -35,17 +35,15 @@ ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 ENV DOCKER_ENV=true
 
-# 复制完整 .next + package.json + 运行时依赖 + scripts
+# 从 amd64 builder 拷贝生产 node_modules（运行时全是纯 JS，无 armhf native）
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+# 复制完整 .next + 运行时文件 + scripts
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
 COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/next.config.js ./
 COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./
-
-RUN corepack enable && corepack prepare pnpm@latest --activate
-# 用 pnpm 按 lockfile 装生产依赖（避免 npm 重新解析 peer 冲突）
-RUN pnpm install --prod --frozen-lockfile --ignore-scripts --no-optional
 
 USER nextjs
 
