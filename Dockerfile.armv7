@@ -24,6 +24,10 @@ ENV DOCKER_ENV=true
 
 RUN pnpm run build
 
+# 在 amd64 builder 里裁掉 devDependencies（此处 pnpm 版本与 lockfile 一致）
+RUN pnpm prune --prod --ignore-scripts --no-optional --force && \
+    node -e "const p=require('./package.json'); console.log('pruned: kept',Object.keys(p.dependencies||{}).length,'prod / removed',Object.keys(p.devDependencies||{}).length,'dev')"
+
 # ---- 第 3 阶段：arm/v7 运行时 ----
 FROM node:20-alpine AS runner
 
@@ -36,13 +40,8 @@ ENV PORT=3000
 ENV DOCKER_ENV=true
 
 COPY --from=builder --chown=nextjs:nodejs /app/pnpm-lock.yaml ./
-# 从 amd64 builder 拷贝 node_modules（运行时纯 JS，无 armhf native）
+# 从 amd64 builder 拷贝已裁好的 node_modules（devDependencies 已 prune）
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-# 裁掉 devDependencies，大幅减小镜像
-RUN corepack enable && \
-    corepack prepare pnpm@latest --activate && \
-    pnpm prune --prod --ignore-scripts --no-optional --force && \
-    node -e "const p=require('./package.json'); console.log('kept',Object.keys(p.dependencies||{}).length,'prod deps, removed',Object.keys(p.devDependencies||{}).length,'dev deps')"
 # 复制完整 .next + 运行时文件 + scripts
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
 COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
