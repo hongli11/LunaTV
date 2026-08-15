@@ -1,0 +1,33 @@
+# LunaTV armv7 盒子部署。redis 存储 + 管理员登录。
+# 用法：cd 本目录; docker compose up -d
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: lunatv-redis
+    restart: unless-stopped
+    volumes:
+      - /opt/lunatv/redis-data:/data
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    networks:
+      - lunatv-net
+
+  lunatv:
+    image: ghcr.io/hongli11/lunatv:armv7-latest
+    container_name: lunatv
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - redis
+    environment:
+      NEXT_PUBLIC_STORAGE_TYPE: "redis"
+      STORAGE_TYPE: "redis"
+      REDIS_URL: "redis://redis:6379"
+      PASSWORD: "123456"
+      USERNAME: "admin"
+    networks:
+      - lunatv-net
+
+networks:
+  lunatv-net:
+    driver: bridge
