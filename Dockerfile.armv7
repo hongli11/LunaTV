@@ -39,8 +39,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/pnpm-lock.yaml ./
 # 从 amd64 builder 拷贝 node_modules（运行时纯 JS，无 armhf native）
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 # 裁掉 devDependencies，大幅减小镜像
-RUN pnpm prune --prod --ignore-scripts --no-optional --force && \
-    node -e "const p=require('./package.json'); console.log('kept:', Object.keys(p.dependencies||{}).length,'prod deps')"
+RUN corepack enable && \
+    corepack prepare pnpm@latest --activate && \
+    pnpm prune --prod --ignore-scripts --no-optional --force && \
+    node -e "const p=require('./package.json'); console.log('kept',Object.keys(p.dependencies||{}).length,'prod deps, removed',Object.keys(p.devDependencies||{}).length,'dev deps')"
 # 复制完整 .next + 运行时文件 + scripts
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
 COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
